@@ -2,15 +2,17 @@
 title: "Analysis of glioblastoma (GBM) scRNA-seq samples with scBubbletree"
 author: "Simo Kitanovski (simo.kitanovski@uni-due.de)"
 output:
-  github_document:
-    toc: true
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+  pdf_document:
+    toc: yes
     toc_depth: 2
-vignette: >
-  %\VignetteIndexEntry{Analysis of glioblastoma (GBM) scRNA-seq samples with scBubbletree}
-  %\VignetteEncoding{UTF-8}
-  %\VignetteEngine{knitr::rmarkdown}
-editor_options: 
-  markdown: 
+vignette: "%\\VignetteIndexEntry{Analysis of glioblastoma (GBM) scRNA-seq samples
+  with scBubbletree} %\\VignetteEncoding{UTF-8} %\\VignetteEngine{knitr::rmarkdown}\n"
+editor_options:
+  markdown:
     wrap: 72
 ---
 
@@ -581,15 +583,20 @@ g_e <- get_num_tiles(btd = btd,
     plot_annotation(tag_levels = 'A')
 ```
 
-### What are the dominant phases of the cells in each bubble? {.unlisted .unnumbered}
+### What is the dominant cell phase in the bubbles? {.unlisted .unnumbered}
 
-According to panel B, the predominant cell phases vary from bubble to
-bubble. For instance, the cells in the bubbles containing immune cells
-are predominantly in G1 phase, i.e. over 73% of the cells in bubble 6,
-4, 0, 9, 7, 1, 2 and 3 are in this phase.
+According to panel B, the dominant cell phases vary from bubble to
+bubble. The cells in the bubbles containing immune cells are
+predominantly in G1 phase, i.e. \>73% of the cells in each of the
+bubbles 6, 4, 0, 9, 7, 1, 2 and 3 are in this phase. This makes sense
+from a biological point of view, i.e. most immune cells are likely
+resting, and in their quiescent state they do not need to proliferate,
+thus they remain in the G0/G1 phase until activated.
 
-In contrast to this, we see higher prevalence of S (synthesis phase)
-phase for cells in the bubbles containing tumor cell.
+In contrast to this, tumor cells, are more likely to be found in S and
+G2/ M phases due to their constant division. This is exactly what we
+observe, i.e. we see higher fraction of S (synthesis phase) phase for
+cells in the bubbles containing tumor cell.
 
 The quantitative summaries encoded in panel B makes the visual generated
 by scBubbletree more informative than the complementary t-SNE visual
@@ -607,7 +614,6 @@ ggplot(data = GBM_meta)+
   scale_color_discrete(name = "tissue")
 ```
 
-
 ### What is the average expression of marker genes in each bubble? {.unlisted .unnumbered}
 
 Next, we visualized the average expression values of 26 marker genes in
@@ -623,12 +629,12 @@ characteristic markers.
 Here are few examples of this analysis:
 
 -   CD14 is a marker of monocytes. CD14 has high average expression in
-    cells from bubble 0 ($\approx 1.2$). We know from the cell type
+    cells from bubble 0 ($\approx$ 1.2). We know from the cell type
     annotation visual shown earlier that bubble 0 is enriched with
     monocytes.
 -   NCAM1 is a marker of different tumors. NCAM1 has high average
     expression in cells from the tumor cell enriched bubbles 5
-    ($\approx 1.7$) and 8 ($\approx 1.9$).
+    ($\approx$ 1.7) and 8 ($\approx$ 1.9).
 
 # Summary
 
