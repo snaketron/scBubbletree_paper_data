@@ -2,13 +2,13 @@
 title: "Analysis of scRNA-seq data from glioblastoma (GBM) patients with scBubbletree"
 author: "Simo Kitanovski (simo.kitanovski@uni-due.de)"
 output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
   html_document:
     toc: yes
     toc_depth: '2'
     df_print: paged
-  pdf_document:
-    toc: yes
-    toc_depth: 2
 vignette: "%\\VignetteIndexEntry{Analysis of scRNA-seq data from glioblastoma (GBM) patients with scBubbletree} %\\VignetteEncoding{UTF-8} %\\VignetteEngine{knitr::rmarkdown}\n"
 editor_options:
   markdown:
@@ -593,17 +593,15 @@ g_ce <- (get_num_cell_tiles(btd = btd, f = GBM_exp[,1], feature_name = "CD68"))$
     (get_num_cell_tiles(btd = btd, f = GBM_exp[,18], feature_name = "FCGR3A"))$plot|
     (get_num_cell_tiles(btd = btd, f = GBM_exp[,15], feature = "CD8A"))$plot
 
-g_ce
 ```
 
 
 
 
-```{r, fig.width=9.5, fig.height=5.5}
+```{r, fig.width=11, fig.height=5}
 g6 <- (btd$tree|g_p$plot|g_ce)+
     plot_layout(widths = c(1, 0.4, 2.55))+
     plot_annotation(tag_levels = 'A')
-
 
 g6
 ```
