@@ -2,13 +2,13 @@
 title: "Analysis of scRNA-seq data from glioblastoma (GBM) patients with scBubbletree"
 author: "Simo Kitanovski (simo.kitanovski@uni-due.de)"
 output:
-  pdf_document:
-    toc: yes
-    toc_depth: 2
   html_document:
     toc: yes
     toc_depth: '2'
     df_print: paged
+  pdf_document:
+    toc: yes
+    toc_depth: 2
 vignette: "%\\VignetteIndexEntry{Analysis of scRNA-seq data from glioblastoma (GBM) patients with scBubbletree} %\\VignetteEncoding{UTF-8} %\\VignetteEngine{knitr::rmarkdown}\n"
 editor_options:
   markdown:
