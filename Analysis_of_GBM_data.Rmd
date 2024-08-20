@@ -2,13 +2,13 @@
 title: "Analysis of scRNA-seq data from glioblastoma (GBM) patients with scBubbletree"
 author: "Simo Kitanovski (simo.kitanovski@uni-due.de)"
 output:
-  pdf_document:
-    toc: yes
-    toc_depth: 2
   html_document:
     toc: yes
     toc_depth: '2'
     df_print: paged
+  pdf_document:
+    toc: yes
+    toc_depth: 2
 vignette: "%\\VignetteIndexEntry{Analysis of scRNA-seq data from glioblastoma (GBM) patients with scBubbletree} %\\VignetteEncoding{UTF-8} %\\VignetteEngine{knitr::rmarkdown}\n"
 editor_options:
   markdown:
@@ -152,11 +152,10 @@ To do clustering we need two sets of inputs:
 
 ### How to determine $r$? {.unlisted .unnumbered}
 
-`r Biocpkg("scBubbletree")` allows us to determine $r$ from the data
-based on the gap statistic, which is implemented in the function
-`get_r`. This function is explained in greater detail in our manuscript.
-We will evaluate the gap statistic using the following vector of $r$
-values:
+To determine the clustering resolution, we computed the gap statistic
+for the Louvain method with resolution parameter $r=10^R$, where $R$ was
+initialized using a sequence of values from -4 to 1 in steps of 0.1. At
+each resolution we recorded the number $k'$ of identified communities.
 
 ```{r}
 rs <- 10^seq(from = -4, to = 1, by = 0.1)
@@ -172,26 +171,35 @@ save(data_r, file = "GBM_data/data_r.RData")
 
 ### How does the gap curve behave as a function of $r$? {.unlisted .unnumbered}
 
-The gap increases rapidly between $k'=5$ and $k'=13$. (figure below,
-panel A). After $k'=13$, the gap starts to drop to values below 4. Next,
-the gap increases gradually to 4.13 at $k'=25$, i.e. even though we
-nearly double the number of communities, the gap increases by only 0.13.
-Next, we see another dip in the gap, followed by another gradual
-increase to 4.22 at $k'=45$.
+The gap increased rapidly between $k'=1$ and $k'=13$, followed by a dip
+at $k'=14$ to a value below 4. Between $k'=13$ and $k'=25$, the gap
+increased gradually by only about 0.15, even though 12 communities
+(about two-fold more) were added in this interval. This suggested that
+there is little benefit in using values of $r$ larger than 0.158
+($k'=13$). At higher $k'$ we observed a slower and approximately linear
+increase in the gap.
 
-From `get_r` we get a mapping between the tested resolutions `r` and the
-corresponding numbers of detected communities $k'$ (figure below, panel
-B).
+The value of $k'=13$ is close to the number of clusters identified in
+the publication by Schmassmann et al., 2023, which reports between $k=10$
+and $k=22$ clusters of transcriptionally similar cells. 
 
-The resolution $r=0.158$ ($k'=13$) looks like a good first choice to
-identify the canonical cell types in the GBM data. If the user is
-interested in e.g. finding rare tumor cells, then we recommend using a
-higher resolution: $r=0.79$ ($k'=25$) or even to $r=2.51$ ($k'=45$).
 
-scBubbletree's clustering workflow is transparent. It demands the user
-to think and evaluate different clustering resolutions and thereby
-understand the data. The only cost is the additional computational time
-required to run `get_r` or `get_k`.
+> Clustering of cells was performed with hierarchical clustering on the
+> Euclidean distances between cells (with Ward's criterion to minimize
+> the total variance within each cluster Murtagh and Legendre, 2014;
+> package cluster version 2.1.0). The number of clusters used for
+> following analyses was identified by applying a dynamic tree cut
+> (package dynamicTreeCut, version 1.63--1) (Langfelder et al., 2008),
+> resulting in 10 with argument deepSplit set to 1, or 22 clusters with
+> argument deepSplit set to 2.
+
+
+To find e.g. rare tumor cells, one can increase the resolution to e.g. 
+$r=0.79$ ($k'=25$) or $r=2.51$ ($k'=45$). Note, that scBubbletree's 
+clustering workflow is transparent. It demands from the user to think 
+and evaluate different clustering resolutions and thereby understand 
+the data. The only cost is the additional computational time required 
+to run `get_r` or `get_k`.
 
 ```{r, fig.width=7, fig.height=3}
 g1 <- ggplot(data_r$gap_stats_summary)+
@@ -215,33 +223,19 @@ g2 <- ggplot(data_r$gap_stats_summary)+
 g1|g2+plot_annotation(tag_levels = 'A')
 ```
 
-### The clustering resolution $k'=13$ is comparable with the number of clusters identified by Schmassmann et al., 2023 {.unlisted .unnumbered}
 
-Schmassmann et al., 2023, identified between $k=10$ and $k=22$ clusters
-of transcriptionally similar cells with hierarchical clustering:
-
-> Clustering of cells was performed with hierarchical clustering on the
-> Euclidean distances between cells (with Ward's criterion to minimize
-> the total variance within each cluster Murtagh and Legendre, 2014;
-> package cluster version 2.1.0). The number of clusters used for
-> following analyses was identified by applying a dynamic tree cut
-> (package dynamicTreeCut, version 1.63--1) (Langfelder et al., 2008),
-> resulting in 10 with argument deepSplit set to 1, or 22 clusters with
-> argument deepSplit set to 2.
 
 # **Step 2-3:** clustering and hierarchical bubble grouping $\rightarrow$ bubbletree
 
-Next, we perform Louvain clustering with $r=0.158$ ($k'=13$). Once the
-clusters (bubbles) are identified, we will arrange the bubbles in a
-bubbletree (hierarchical dendrogram) using hierarchical clustering with
-average linkage.
-
-To construct the bubbletree, we will use $B=300$ bootstrap iterations.
-In each iteration, we will draw from eacLet'sbble $N_\text{eff}=100$
-cells at random without replacement. The details of the bubbletree
-construction algorithm are provided in our manuscript.
-
-Lets run `get_bubbletree_graph` with $r=0.158$:
+For clustering of dataset GBM we will use the original Louvain method and 
+a resolution parameter $r=0.158$ ($k'=13$). First, we will construct an 
+SNN graph based on $A^{45,466 \times 15}$, where each vertex (cell) in 
+the SNN graph is connected to its 50 nearest neighbors. Clustering will 
+be performed with 20 random starts and up to 100 iterations in each run.
+The clusters will be organized in a bubbletree using hierarchical clustering 
+with average linkage. For this we will use $B=1,000$ bootstrap iterations 
+and draw samples with up to $N_\textit{eff}=100$ cells from each cluster 
+to compute inter-cluster distances:
 
 ```{r}
 # graph-based clustering -> bubbletree
@@ -256,35 +250,29 @@ btd <- get_bubbletree_graph(x = GBM_A,
                             N_eff = 100)
 ```
 
+
 # **Step 4:** bubbletree visualization and annotation
 
 ## Lets inspect the bubbletree
 
-We see two outstandingly large bubbles: 0 and 1. These bubbles account
-for about 50% of the cells in the GBM data. The smallest bubble 12
-contains only 184 cells (0.4% of all cells).
-
-Nearly all of the branches in the bubbletree are completely robust, i.e.
-they were observed consistently in $B$=300 bootstrap iterations. Only
-the branch between the bubble 3 and 2 is less robust and is found in
-less than half of the bootstrap dendrograms.
-
-For biological interpretation of the bubbletree structure, we will have
-to annotate the bubbletree with cluster-specific summaries of different
-cell features (see next section).
-
-```{r, fig.width=5, fig.height=4}
+```{r, fig.width=5, fig.height=3}
 btd$tree
 ```
 
+The resulting bubbletree has 13 bubbles with sizes ranging from about
+11,800 cells (26%, cluster 0) down to 184 cells (0.4%, cluster 12).
+Nearly all branches in the bubbletree are completely robust. The branch
+between bubbles 2 and 3 has low branch support as it is found in only
+457 out of 1,000 bootstrap dendrograms.
+
+
 ## Annotating the bubbletree with cell features
 
-`r Biocpkg("scBubbletree")` stacks bubble-specific summaries of
-categorical and numeric cell features with the bubbletree.
-
-Here, we will use the function `get_cat_tiles` to generate heatmaps for
-each of the following categorical features, which are provided as part
-of the meta-data:
+For biological interpretation of the bubbletree structure, we will
+annotate the bubbletree with cluster-specific summaries of different
+cell features. Here, we will use the function `get_cat_tiles` to
+generate heatmaps for each of the following categorical features, which
+are provided as part of the meta-data:
 
 1.  coarse-grained cell type labels
 2.  fine-grained cell type labels
@@ -297,25 +285,21 @@ to the categories (labels; x-axis) of each feature, i.e. the
 within-bubble relative frequency of the different labels.
 
 To visualize numeric features, such as mean gene expressions in each
-bubble, we will use the function `get_num_tiles`.
+bubble, we will use the functions `get_num_tiles`, `get_num_violins`,
+and `get_num_cell_tiles`.
+
 
 ## What is the **cell type** composition of the bubbles?
 
-To answer this question, we will run the function `get_cat_tiles` using
-as input two categorical features (two columns in `GBM_meta`:
-CellAnnotation and CellAnnotationFine), which provide the predicted cell
-type labels of each cell at two levels of resolution: coarse-grained and
-fine-grained, respectively.
+To determine which cell types are enriched in each bubble, we will visualize
+the within-bubble relative frequencies of fine- and coarse-grained cell
+type labels (heatmaps in Figs. B and C, below). To this end, we will run
+the function `get_cat_tiles` using as input two categorical features
+(two columns in `GBM_meta`: CellAnnotation and CellAnnotationFine),
+which provide the predicted cell type labels of each cell at two levels
+of resolution: coarse- grained and fine-grained, respectively.
 
-We also have the tissue site of each cell as a categorical feature
-(column tissue in data `GBM_meta`). We will also show the tissue-site
-composition within each bubble. We expect the Let's of the bubbles will
-be enriched with cells from the central tumor tissue samples, while
-others will be enriched with cells from the blood samples.
-
-Lets run this function now:
-
-```{r}
+```{r, fig.width=8.5, fig.height=5}
 # cell type annotations
 g_c <- get_cat_tiles(btd = btd,
                      f = GBM_meta$CellAnnotation,
@@ -330,58 +314,64 @@ g_cf <- get_cat_tiles(btd = btd,
                       tile_text_size = 2,
                       integrate_vertical = FALSE)
 
+g_ct <- (btd$tree|g_c$plot|g_cf$plot)+
+  plot_layout(widths = c(1, 1, 1.5))+
+  plot_annotation(tag_levels = 'A')
+
+g_ct
+```
+
+The analysis shows that more than 95% of the cells in bubbles 8, 5, 11,
+10, and 12 were CD45- (non-hematopoietic cells), while the remaining
+bubbles are enriched with immune cells, consistent with the results
+reported in Schmassmann et al., 2023.
+
+The bubbletree conserves global transcriptional distances between
+bubbles, grouping them into a PBMC clade with T-cells (bubbles 3, 2, and
+1), B-cells (bubble 7), NK-cells (bubbles 3 and 2), monocytes (bubbles
+9, 0, and 4), and neutrophils (bubbles 9 and 4). Additionally, it
+identifies multiple non-PBMC populations including microglia (bubble 6),
+macrophages (bubble 4), tumor cells (bubbles 5 and 8), and other smaller
+cell populations.
+
+
+## What is the **tissue** composition of the bubbles?
+
+Dataset GBM contains samples from three tissues: PBMC, tumor center, and
+peripheral infiltration zone. Using tissue as categorical cell features,
+we will next visualize the relative frequency of cells from a specific tissue
+within the different bubbles (heatmap in Fig. D).
+
+```{r, fig.width=9.5, fig.height=5}
 # tissue
 g_t <- get_cat_tiles(btd = btd,
                      f = GBM_meta$tissue,
                      round_digits = 1,
                      tile_text_size = 2,
                      integrate_vertical = FALSE)
-```
 
-Next, we will join the bubbletree with these annotations into one
-visual:
-
-```{r, fig.width=9.5, fig.height=5.5}
-g3 <- (btd$tree|g_c$plot|g_cf$plot|g_t$plot)+
-    plot_layout(widths = c(1, 1, 1.5, 0.4))+
-    plot_annotation(tag_levels = 'A')
+g3 <- (g_ct|g_t$plot)+
+  plot_layout(widths = c(1, 1, 1.5, 0.4))+
+  plot_annotation(tag_levels = 'A')
 
 g3
 ```
 
-### Lets interpret this visual {.unlisted .unnumbered}
+We observe that many bubbles enriched with PBMC cell types had high
+relative frequency of cells from PBMC tissue, except for bubble 3, which
+contains a mixture of cells from the tumor center and peripheral
+infiltration zone tissues. Hence, bubble 3 may contain
+tumor-infiltrating lymphocytes. The remaining bubbles in the bubbletree
+contain a mixture of cells from tumor center and peripheral
+infiltration zone tissues. Meanwhile, bubbles 5 and 8 are mostly
+composed of tumor cells from tumor centers.
 
-First, \>95% of the cells in bubbles 8, 5, 11, 10 and 12 are CD45-
-(non-hematopoietic cells). Second, the remaining bubbles are enriched
-with immune cells. This is consistent with the results in the:
+### Lets compare the previous visual with a 2D t-SNE plot {.unlisted .unnumbered}
 
-> "Using hierarchical clustering, the cells were partitioned into
-> clusters (Figure 2-figure supplement 1A and B) which were then
-> annotated into nine distinct cell types for the immune subset,
-> including two transcriptionally distinct MG subsets (MG_1 and MG_2)
-> and four cell types for the CD45-subset (Figure 2A; Figure 2-figure
-> supplement 1C and D; Supplementary file 3)."
+We will plot the same 2D t-SNE visual reported by Schmassmann et al.,
+2023.
 
-Importantly, the bubbletree conserves global transcriptional distances
-between these bubbles and splits the bubbles in two branches:
-
--   lymphocytes: B-cells, T-cells, NK-cells, etc.
--   non-lymphocytes: monocytes, neutrophils, microglia and macrophages
-
-Third, we see two biologically interesting bubbles 3 and 6:
-
--   bubble 3: tumor-infiltrating lymphocytes $\rightarrow$ the bubble
-    has few PBMCs
--   bubble 6: microglia and macrophages
-
-Global distances between the clusters are **not** adequately conserved
-in the 2D t-SNE plot presented in Schmassmann et al., 2023 (below is the
-replicated version of Figure 2A from Schmassmann et al., 2023).
-Furthermore, the 2D t-SNE plot suffers from heavy overplotting. This
-challenge occurs despite the fact that the cells are split into three
-panels for each tissue site.
-
-```{r, fig.width=7, fig.height=3.5}
+```{r, fig.width=7, fig.height=3.25}
 g4 <- ggplot(data = GBM_meta)+
   facet_wrap(facets = ~tissue, nrow = 1)+
   geom_point(aes(x = tSNE1, y = tSNE2, col = CellAnnotation), size = 0.25)+
@@ -393,38 +383,63 @@ g4 <- ggplot(data = GBM_meta)+
 g4
 ```
 
-## Compositional analysis: are all cells from different samples **evenly mixed** within bubbles?
+Global distances between the clusters are **not** adequately conserved
+in the 2D t-SNE plot. Furthermore, the 2D t-SNE plot suffers from heavy
+overplotting, despite the fact that the cells are split into three
+panels for each tissue site.
 
-When analyzing multi-sample scRNA-seq data, we have to ask ourselves the
-following questions:
+## Compositional analysis: are cells from different samples **evenly mixed** within bubbles?
 
--   is bubble $i$ composed of cells from all of the samples (even
-    mixture)?
--   is bubble $i$ enriched with cells from only one sample $j$?
--   what is the relative abundance of cells from different samples
-    *within* a bubble?
--   what is the relative abundance of cells from a specific sample
-    *across* all bubbles?
+Dataset GBM contains samples from five patients and three tissues. Using
+tissue and patient as categorical cell features, we will visualize the
+relative frequency of cells from a specific tissue and patient across
+the different bubbles (heatmap in Fig. B, below) as well as within the
+bubbles (heatmap in Fig. C, below). This allows us to check for
+compositional biases, which is essential to e.g. identify novel cell
+types (e.g. tumor cells), or to detect systematic biases (e.g. batch
+effects) in a subset of the samples.
 
-Here, we have samples from **five patients**. From each patient we have
-paired samples from three tissues:
+```{r, fig.width=9.5, fig.height=5.25}
+g_p_v <- get_cat_tiles(btd = btd,
+                     f = paste0(GBM_meta$tissue, '-', GBM_meta$patient),
+                     round_digits = 1,
+                     tile_text_size = 2,
+                     integrate_vertical = TRUE)
 
--   tumor center
--   peripheral infiltration zone
--   blood
+g_p_h <- get_cat_tiles(btd = btd,
+                     f = paste0(GBM_meta$tissue, '-', GBM_meta$patient),
+                     round_digits = 1,
+                     tile_text_size = 2,
+                     integrate_vertical = FALSE)
 
-We assume that blood samples are similar across patients, i.e. they are
-made up from similar cell types. Hence, in sample $i$ we expect similar
-relative abundance of cells across all bubbles.
+g5 <- (btd$tree|g_p_v$plot|g_p_h$plot)+
+    plot_layout(widths = c(1, 1.3, 1.3))+
+    plot_annotation(tag_levels = 'A')
 
-This assumption may not be correct in terms of the samples from tumor
-center or peripheral infiltration zone. These samples are enriched with
-tumor cells, and we know that GBM are heterogeneous both within and
-between patients.
+g5
+```
 
-From Schmassmann et al., 2023 we get the following remarks about the
-degree of overlap of cells from the different patients across cell types
-(clusters):
+In the next, we describe the key compositional biases:
+
+-   First, all PBMC samples (middle columns in Fig. B, above) have
+    similar relative abundances across the bubbles. In contrast, the
+    samples from tumor center and peripheral infiltration zone are
+    heterogeneous in terms of their relative abundances across the
+    bubbles.
+
+-   Second, all bubble 5 cells come from patient 604 (95.6% from
+    center-604 and 4.4% periphery-604) (Fig C, above), and 69.4% of the
+    cells in sample center-604 are assigned to bubble 5 (NPC-like tumor
+    cells)
+
+-   Third, the majority of cells in bubbles 11, 10, and 12 came from
+    patients 604 and 617.
+
+
+In summary, we observed high degree of GBM heterogeneity between individuals. 
+Yet, despite these biases, from Schmassmann et al., 2023, we get the following 
+remarks about the degree of overlap of cells from the different patients 
+across cell types (clusters):
 
 > As we observed a good overlap of cells across patients for most of the
 > dataset (see Methods; Figure 1-figure supplement 2B-F), we chose not
@@ -439,72 +454,6 @@ degree of overlap of cells from the different patients across cell types
 > slightly elevated patient- specific structure, while it was most
 > pronounced for the CD45 negative subset.
 
-We replicated this analysis with `r Biocpkg("scBubbletree")` (figure
-below). Our analysis with `get_cat_tiles` visualized the relative
-abundance of cells from different samples (samples IDs are available for
-each cell) across different bubbles by setting
-`integrate_vertical = TRUE` (panel B). We also show the within-bubble
-composition by setting `integrate_vertical = FALSE` (panel C).
-
-```{r}
-g_p_v <- get_cat_tiles(btd = btd,
-                     f = paste0(GBM_meta$tissue, '-', GBM_meta$patient),
-                     round_digits = 1,
-                     tile_text_size = 2,
-                     integrate_vertical = TRUE)
-
-g_p_h <- get_cat_tiles(btd = btd,
-                     f = paste0(GBM_meta$tissue, '-', GBM_meta$patient),
-                     round_digits = 1,
-                     tile_text_size = 2,
-                     integrate_vertical = FALSE)
-```
-
-```{r, fig.width=9.5, fig.height=5.5}
-g5 <- (btd$tree|g_p_v$plot|g_p_h$plot)+
-    plot_layout(widths = c(1, 1.3, 1.3))+
-    plot_annotation(tag_levels = 'A')
-
-g5
-```
-
-### New observation: skewed within-bubble distribution of sample IDs {.unlisted .unnumbered}
-
-First, we evaluated the samples derived from blood (middle part of panel
-B). Across-bubbles, the samples IDs have similar relative abundances for
-these samples. There were also exceptions:
-
--   sample PBMC-616 is enriched with monocytes (cells from bubble 0)
--   sample PBMC-617 is enriched with neutrophils (cells from bubble 9)
--   From panel C we observe that about 88% of the bubble 9 cells belong
-    to sample PBMC-617, i.e. the bulk of the cells from this bubble come
-    from sample PBMC-617
-
-Second, we evaluated the samples from tumor center and peripheral
-infiltration zone. In these samples we see skewed relative abundance of
-cells across the bubbles:
-
--   in panel B we see that about 70% of the cells from sample center-604
-    and 10.6% of the cells from sample periphery-604 are assigned to
-    bubble 5 (NPC-like tumor cells). According to panel C, nearly all of
-    the cells from this bubble come from patient 604. The same can be
-    said about bubbles 11, 10 and 12, i.e. few cells in these bubbles
-    come from patients other than 604.
--   according to panel C, bubble 8 is enrichmed with cells from the
-    samples center-616 and center-617, and according to panel B, few
-    cells from the remaining samples are assigned to this bubble.
-
-In conclusion, scBubbletree visualizes the relative abundance of sample
-labels within and across bubbles as categorical features. The resulting
-visuals (panels B and C above) are rich with quantitative summaries,
-which facilitates rapid detection of compositional biases between the
-samples.
-
-The bubbles with immune cells contained a mixture of cells from each
-patient. The bubbles with tumor cells were often patient-specific, i.e.
-they were made up from cells from individual patients. This is a
-realistic outcome given the high degree of GBM heterogeneity both within
-and between individuals.
 
 ## **Quality control** with `r Biocpkg("scBubbletree")`
 
@@ -527,7 +476,7 @@ g_qc <- get_num_violins(btd = btd,
                                                    "NumberDetectedGenes")]))
 ```
 
-```{r, fig.width=9, fig.height=5}
+```{r, fig.width=8, fig.height=5}
 (btd$tree|g_qc$plot)+
     plot_layout(widths = c(1, 2.2))+
     plot_annotation(tag_levels = 'A')
@@ -559,16 +508,20 @@ We have replicated their visual below:
     guides(colour = guide_legend(override.aes = list(size=2))))
 ```
 
+
 ## Other cell features: **cell phase** and **gene expression**
 
 There is no limit to the number of type of cell features that can be
 used to annotate the bubbletree. In the next, we show how to 'attach'
-summaries of predicted cell phase labels (panel B) and gene expressions
-(panel C) to the bubbles.
+summaries of predicted cell phase labels and gene expressions to the bubbles.
 
-Lets create these plots:
+### What is the dominant cell phase in the bubbles? {.unlisted .unnumbered}
 
-```{r}
+Using cell phase as categorical cell features, we visualized the relative 
+frequency of cells with a cell phase G1, G2M, and S, within the different 
+bubbles.
+
+```{r, fig.width=5.5, fig.height=4}
 # cell cycle phase
 g_p <- get_cat_tiles(btd = btd,
                      f = GBM_meta$CellCyclePhase,
@@ -576,41 +529,15 @@ g_p <- get_cat_tiles(btd = btd,
                      tile_text_size = 2,
                      integrate_vertical = FALSE)
 
-# gene expression
-g_e <- get_num_tiles(btd = btd,
-                     fs = GBM_exp,
-                     summary_function = "mean",
-                     round_digits = 1,
-                     tile_text_size = 2)
+(btd$tree|g_p$plot)+
+  plot_layout(widths = c(1.5, 1))+
+  plot_annotation(tag_levels = 'A')
 ```
 
 
-
-```{r, fig.width=7, fig.height=4}
-# gene expression
-g_ce <- (get_num_cell_tiles(btd = btd, f = GBM_exp[,1], feature_name = "CD68"))$plot|
-    (get_num_cell_tiles(btd = btd, f = GBM_exp[,2], feature_name = "TMEM119"))$plot|
-    (get_num_cell_tiles(btd = btd, f = GBM_exp[,18], feature_name = "FCGR3A"))$plot|
-    (get_num_cell_tiles(btd = btd, f = GBM_exp[,15], feature = "CD8A"))$plot
-
-```
-
-
-
-
-```{r, fig.width=11, fig.height=5}
-g6 <- (btd$tree|g_p$plot|g_ce)+
-    plot_layout(widths = c(1, 0.4, 2.55))+
-    plot_annotation(tag_levels = 'A')
-
-g6
-```
-
-### What is the dominant cell phase in the bubbles? {.unlisted .unnumbered}
-
-According to panel B, the dominant cell phases vary from bubble to
+According to the heatmap, the dominant cell phases vary from bubble to
 bubble. The cells in the bubbles containing immune cells are
-predominantly in G1 phase, i.e. \>73% of the cells in each of the
+predominantly in G1 phase, i.e. >73% of the cells in each of the
 bubbles 6, 4, 0, 9, 7, 1, 2 and 3 are in this phase. This makes sense
 from a biological point of view, i.e. most immune cells are likely
 resting, and in their quiescent state they do not need to proliferate,
@@ -627,7 +554,7 @@ by scBubbletree more informative than the complementary t-SNE visual
 cell phases (presented in Schmassmann et al., 2023 as Figure 1-figure
 supplement 1 E).
 
-```{r, fig.width=7, fig.height=3.5}
+```{r, fig.width=7, fig.height=3.25}
 g7 <- ggplot(data = GBM_meta)+
   facet_wrap(facets = ~tissue, nrow = 1)+
   geom_point(aes(x = tSNE1, y = tSNE2, col = CellCyclePhase), size = 0.5)+
@@ -639,6 +566,7 @@ g7 <- ggplot(data = GBM_meta)+
 g7
 ```
 
+
 ### What is the average expression of marker genes in each bubble? {.unlisted .unnumbered}
 
 Next, we visualized the average expression values of 26 marker genes in
@@ -647,7 +575,27 @@ al., 2023. Numeric features, such as gene expressions, can be visualized
 with scBubbletree. For this we can use the functions `get_num_tiles` or
 `get_num_violins`. To generate panel C we used `get_num_tiles`.
 
-We can evaluate panel C to double-check whether the cell type
+```{r, fig.width=9, fig.height=4}
+# gene expression
+g_e <- get_num_tiles(btd = btd,
+                     fs = GBM_exp,
+                     summary_function = "mean",
+                     round_digits = 1,
+                     tile_text_size = 2)
+
+# gene expression
+g_ce <- (get_num_cell_tiles(btd = btd, f = GBM_exp[,1], feature_name = "CD68"))$plot|
+    (get_num_cell_tiles(btd = btd, f = GBM_exp[,2], feature_name = "TMEM119"))$plot|
+    (get_num_cell_tiles(btd = btd, f = GBM_exp[,18], feature_name = "FCGR3A"))$plot|
+    (get_num_cell_tiles(btd = btd, f = GBM_exp[,15], feature = "CD8A"))$plot
+
+
+(btd$tree|g_e$plot)+
+  plot_layout(widths = c(1, 3))+
+  plot_annotation(tag_levels = 'A')
+```
+
+We can evaluate heatmap B to double-check whether the cell type
 predictions are consistent with the gene expression of cell type
 characteristic markers.
 
@@ -660,6 +608,36 @@ Here are few examples of this analysis:
 -   NCAM1 is a marker of different tumors. NCAM1 has high average
     expression in cells from the tumor cell enriched bubbles 5
     ($\approx$ 1.7) and 8 ($\approx$ 1.9).
+
+
+### What is the expression of individual cells? {.unlisted .unnumbered}
+
+To visualize numeric features of individual cells we used the function 
+`get_num_cell_tiles`, which visualizes numeric attributes of individual 
+cells in each bubble using heatmaps, with the cells ordered by the magnitude 
+of their numeric attributes. Lets do this for 3 marker genes: CD14, NCAM1 and
+CD8A. We see comparable results as in the heatmap generated by `get_num_tiles`.
+
+```{r, fig.width=9, fig.height=4}
+# gene expression
+g_cd14 <- get_num_cell_tiles(btd = btd,
+                          f = GBM_exp[, c("CD14")],
+                          feature_name = "CD14")
+
+g_ncam1 <- get_num_cell_tiles(btd = btd,
+                          f = GBM_exp[, c("NCAM1")],
+                          feature_name = "NCAM1")
+
+g_cd8a <- get_num_cell_tiles(btd = btd,
+                          f = GBM_exp[, c("CD8A")],
+                          feature_name = "CD8A")
+
+
+(btd$tree|g_cd14$plot|g_ncam1$plot|g_cd8a$plot)+
+  plot_layout(widths = c(1, 1, 1, 1))+
+  plot_annotation(tag_levels = 'A')
+```
+
 
 # Summary
 
@@ -709,7 +687,6 @@ ggsave(plot = g_ce,
        height = 3.4,
        dpi = 600)
 ```
-
 
 ```{r}
 sessionInfo()
